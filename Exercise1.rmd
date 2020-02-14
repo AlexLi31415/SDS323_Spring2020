@@ -1,0 +1,22 @@
+---
+title: "Exercise 1"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+## ABIA flights
+```{r flights}
+
+```
+## Regression Practice
+```{r regression}
+creatinine <- read.csv("~/Documents/SDS323Assignments/creatinine.csv")
+lm.fit = lm(age~creatclear, data = creatinine)
+slope = summary(lm.fit)$coefficients[1,1]
+intercept = summary(lm.fit)$coefficients[2,1]
+```
+Estimated creatinine clearance rate for 55-year-old:
+```{r estimate}
+slope + intercept * 55
