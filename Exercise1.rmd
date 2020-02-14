@@ -94,7 +94,7 @@ act60 - exp60
 ```
 We conclude that, based on our linear model, the 40-year-old appears to be healthier for his age, because of his higher adjusted creatinine.
 
-##Green Buildings
+## Green Buildings
 ```{r greenBuildings}
 data <- read.csv("~/Documents/SDS323Assignments/greenbuildings.csv")
 dataFiltered = filter(data, leasing_rate >= 10)
