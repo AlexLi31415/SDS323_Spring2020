@@ -1,6 +1,6 @@
 ---
 title: "Exercise 1"
-output: html_document
+output: pdf_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -111,6 +111,7 @@ We observe that green houses are, on average, much younger than non-green houses
 ```{r greenRegression}
 lm.fit = lm(Rent~age+green_rating, data = data)
 ```
+
 We already observe that, with the age variable, the green rating effect drops drastically, suggesting that age is a major confounding variable. It also appears that older houses tend to charge less rent. Suppose we consider houses designed in the past 30 years, which will apply to the newly designed house.
 ``` {r recentHouses}
 recentNonGreen = filter(nonGreen, age <= 30)
@@ -119,6 +120,7 @@ summary(recentNonGreen$Rent)
 summary(recentGreen$Rent)
 boxplot(recentGreen$Rent, recentNonGreen$Rent, names = c('Green', 'Non-Green'))
 ```
+
 The medians are now virtually indistinguishable, with a difference of 0.2. For the next 30 years, the profit for going green, according to this model, would be approximately 250,000 x 0.2 x 30 = 1.5 million, well below our initial 5 million dollar investment.
 To summarize, the staff member failed to account for the age of the house as a confounding factor when performing his analysis, and the fact that the house will be brand new.  When we only analyze the houses built in the last 30 years, we see that the additional profit for choosing the green option essentially vanishes, calling into question the assertion that the green option is profitable after less than 10 years.
 ## Milk Prices
