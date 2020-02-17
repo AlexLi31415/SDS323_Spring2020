@@ -123,6 +123,7 @@ boxplot(recentGreen$Rent, recentNonGreen$Rent, names = c('Green', 'Non-Green'))
 
 The medians are now virtually indistinguishable, with a difference of 0.2. For the next 30 years, the profit for going green, according to this model, would be approximately 250,000 x 0.2 x 30 = 1.5 million, well below our initial 5 million dollar investment.
 To summarize, the staff member failed to account for the age of the house as a confounding factor when performing his analysis, and the fact that the house will be brand new.  When we only analyze the houses built in the last 30 years, we see that the additional profit for choosing the green option essentially vanishes, calling into question the assertion that the green option is profitable after less than 10 years.
+
 ## Milk Prices
 ```{r milkPricesPlot}
 data <- read.csv("~/Documents/SDS323Assignments/milk.csv")
