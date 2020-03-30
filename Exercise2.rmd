@@ -1,0 +1,251 @@
+---
+title: "Exercise 2"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(FNN)
+library(mosaicData)
+```
+## KNN practice
+Setting up the data:
+```{r KNN350Setup}
+carData <- read.csv("~/Documents/SDS323Assignments/sclass.csv")
+carData350 <- filter(carData, trim == 350)
+n = length(carData350$trim)
+n_train = round(0.8*n)
+n_test = n - n_train
+train_ind = sample.int(n, n_train)
+y = carData350['price']$price
+X = carData350['mileage']
+X_train = X[train_ind,]
+X_test = X[-train_ind,]
+y_train = y[train_ind]
+y_test = y[-train_ind]
+knn_trainset = data.frame(X_train, y_train = y_train)
+knn_testset = data.frame(X_test, y_test = y_test)
+X_train = knn_trainset['X_train']
+X_test = knn_testset['X_test']
+```
+Analysis
+```{r KNN350Analysis}
+df = data.frame(k=integer(0),error=numeric(0))
+kValues = c(2, 3, 5, 7, 9, 15, 25, 51, 75, 101)
+for(i in kValues)
+{
+  knn = knn.reg(train = X_train, test = X_test, y = y_train, k = i)
+  err = (sum((y_test - knn['pred']$pred) ^ 2)/n_test)^0.5
+  df = add_row(df, k = i, error = err)
+}
+p_train = ggplot(data = df) + 
+  geom_point(mapping = aes(x = k, y = error), color='lightgrey') + 
+  theme_bw(base_size=24) + 
+  ylim(8000, 12000) + xlim(0,102)
+p_train + geom_path(mapping = aes(x=k, y=error), color='red', size=1.5)
+```
+
+We observe that k=9 seems to be optimal.
+```{r KNN350Plot}
+#We fit the model on the train set.
+knn = knn.reg(train = X_train, test = X_train, y = y_train, k = 9)
+X_train2 = X_train
+X_train2$pred = knn$pred
+X_train2$y_train = y_train
+X_train2 = X_train2[order(X_train),] #We sort to make graph look smoother
+p_train = ggplot(data = X_train2) + 
+  geom_point(mapping = aes(x = X_train, y = y_train), color='lightgrey') + 
+  theme_bw(base_size=24) + 
+  ylim(0, 150000) + xlim(0, 200000)
+p_train + geom_path(mapping = aes(x = X_train, y = pred), color='red', size=1.5)
+```
+Repeat for trim = 63:
+```{r KNN63}
+carData <- read.csv("~/Documents/SDS323Assignments/sclass.csv")
+carData63 <- filter(carData, trim == '63 AMG')
+n = length(carData350$trim)
+n_train = round(0.8*n)
+n_test = n - n_train
+train_ind = sample.int(n, n_train)
+y = carData63['price']$price
+X = carData63['mileage']
+X_train = X[train_ind,]
+X_test = X[-train_ind,]
+y_train = y[train_ind]
+y_test = y[-train_ind]
+knn_trainset = data.frame(X_train, y_train = y_train)
+knn_testset = data.frame(X_test, y_test = y_test)
+X_train = knn_trainset['X_train']
+X_test = knn_testset['X_test']
+kValues = c(2, 3, 5, 7, 9, 15, 25, 51, 75, 101)
+df = data.frame(k=integer(0),error=numeric(0))
+for(i in kValues)
+{
+  knn = knn.reg(train = X_train, test = X_test, y = y_train, k = i)
+  err = (sum((y_test - knn['pred']$pred) ^ 2)/n_test)^0.5
+  df = add_row(df, k = i, error = err)
+}
+p_train = ggplot(data = df) + 
+  geom_point(mapping = aes(x = k, y = error), color='lightgrey') + 
+  theme_bw(base_size=24) + 
+  ylim(50000, 80000) + xlim(0,102)
+p_train + geom_path(mapping = aes(x=k, y=error), color='red', size=1.5)
+```
+
+We observe that k=15 seems to be optimal.
+```{r KNN63Plot}
+#We fit the model on the train set.
+knn = knn.reg(train = X_train, test = X_train, y = y_train, k = 15)
+X_train2 = X_train
+X_train2$pred = knn$pred
+X_train2$y_train = y_train
+X_train2 = X_train2[order(X_train),] #We sort to make graph look smoother
+p_train = ggplot(data = X_train2) + 
+  geom_point(mapping = aes(x = X_train, y = y_train), color='lightgrey') + 
+  theme_bw(base_size=24) + 
+  ylim(0, 300000) + xlim(0, 150000)
+p_train + geom_path(mapping = aes(x = X_train, y = pred), color='red', size=1.5)
+```
+
+## Saratoga house prices
+```{r Saratoga}
+data(SaratogaHouses)
+summary(SaratogaHouses)
+n = nrow(SaratogaHouses)
+n_train = round(0.8*n)  # round to nearest integer
+n_test = n - n_train
+rmse = function(y, yhat) {
+  sqrt(mean((y - yhat)^2))
+}
+err = 0
+for(i in 1:1000){
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+saratoga_train = SaratogaHouses[train_cases,]
+saratoga_test = SaratogaHouses[test_cases,]
+lm2 = lm(price ~ . - sewer - waterfront - landValue - newConstruction, data=saratoga_train)
+yhat_test2 = predict(lm2, saratoga_test)
+err = err + rmse(saratoga_test$price, yhat_test2)}
+err / 1000
+lm2$coefficients
+```
+Our baseline model error is around 66,000 to 67,000.  I observed by looking at the data that the houses with the highest prices tended to have pctCollege either 57 or 62, suggesting that those numbers may correspond to neighborhoods that are very affluent.  I also took the logarithm of the price and the living area.
+```{r Saratoga2}
+err = 0
+for(i in 1:1000){
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+saratoga_train = SaratogaHouses[train_cases,]
+saratoga_test = SaratogaHouses[test_cases,]
+lm2 = lm(log(price) ~ . + (pctCollege == 62) + (pctCollege == 57) + log(livingArea) - livingArea - sewer - waterfront - landValue - newConstruction, data=saratoga_train)
+yhat_test2 = predict(lm2, saratoga_test)
+err = err + rmse(saratoga_test$price, exp(yhat_test2))
+}
+err / 1000
+lm2$coefficients
+```
+By adding the indications of those neighborhoods, the error dropped to around 62000 to 63000, more than 6% lower than the base model. While obviously, the pctCollege being 57 or 62 may not be significant more, the improvement in the model error does indicate that location may be a major factor, and that adding another variable measuring the wealth of the location of the house may be very helpful.
+We now turn to KNN analysis, using the same variables above:
+```{r SaratogaKNN}
+kValues = c(2, 3, 5, 7, 9, 15, 25, 51, 75, 101, 201, 501, 1001)
+df = data.frame(k=integer(0),error=numeric(0))
+for (j in kValues)
+{
+err = 0
+
+for(i in 1:100)
+{
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+xData = model.matrix(~ .   - sewer - waterfront - landValue - newConstruction - 1 - price, data = SaratogaHouses)
+yData = model.matrix(~log(price) - 1, data = SaratogaHouses)
+X_train = xData[train_cases,]
+X_test = xData[test_cases,]
+y_train = yData[train_cases,]
+y_test = yData[test_cases,]
+scaling = apply(X_train, 2, sd)
+X_train_scaled = scale(X_train, scale = scaling)
+X_test_scaled = scale(X_test, scale = scaling)
+knn = knn.reg(train = X_train_scaled, test = X_test_scaled, y = y_train, k = j)
+err = err + rmse(saratoga_test$price, exp(knn['pred']$pred))
+}
+df = add_row(df, k = j, error = err / 100)
+}
+p_train = ggplot(data = df) + 
+  geom_point(mapping = aes(x = k, y = error), color='lightgrey') + 
+  theme_bw(base_size=24) + 
+  ylim(0, 200000) + xlim(0,1002)
+p_train + geom_path(mapping = aes(x=k, y=error), color='red', size=1.5)
+```
+
+The performance of KNN is much worse on this set of data; with error never falling below 100,000.
+## Online News
+```{r online_news}
+data <- read.csv("~/Documents/SDS323Assignments/online_news.csv")[,-1]
+n = nrow(data)
+n_train = round(0.8*n)  # round to nearest integer
+n_test = n - n_train
+TP = 0
+FP = 0
+TN = 0
+FN = 0
+for(i in 1:100){
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+trainData = data[train_cases,]
+testData = data[test_cases,]
+lm2 = lm(log(shares) ~ . - weekday_is_sunday - is_weekend, data=trainData) 
+#remove redundant variables
+yhat_test2 = predict(lm2, testData)
+pred = (exp(yhat_test2) > 1400)
+actual = (testData$shares > 1400)
+TP = TP + (sum(actual & pred)) / n_test
+TN = TN + (sum(!actual & !pred)) / n_test
+FP = FP + (sum(!actual & pred)) / n_test
+FN = FN + (sum(actual & !pred)) / n_test
+}
+paste("True positive: ", round(TP / 100, digits = 3))
+paste("True negative: ", round(TN / 100, digits = 3))
+paste("False positive: ", round(FP / 100, digits = 3))
+paste("False negative: ", round(FN / 100, digits = 3))
+paste("Accuracy: ", round((TP + TN) / 100, digits = 3))
+nullModel = sum(data$shares > 1400) / n
+paste("Null model accuracy: ", round(max(nullModel, 1 - nullModel), 3))
+```
+
+We observe that our correct prediction rate is somewhat better than the null, but there are a lot of false positives.
+```{r online_news2}
+data <- read.csv("~/Documents/SDS323Assignments/online_news.csv")[,-1]
+n = nrow(data)
+n_train = round(0.8*n)  # round to nearest integer
+n_test = n - n_train
+TP = 0
+FP = 0
+TN = 0
+FN = 0
+for(i in 1:100){
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+trainData = data[train_cases,]
+trainData$shares = ifelse(trainData$shares > 1400, 1, 0)
+testData = data[test_cases,]
+testData$shares = ifelse(testData$shares > 1400, 1, 0)
+logit = glm(shares ~ . - weekday_is_sunday - is_weekend, data=trainData, family='binomial') 
+#remove redundant variables
+yhat_test2 = predict(logit, testData)
+pred = (yhat_test2 > 0)
+TP = TP + (sum(actual & pred)) / n_test
+TN = TN + (sum(!actual & !pred)) / n_test
+FP = FP + (sum(!actual & pred)) / n_test
+FN = FN + (sum(actual & !pred)) / n_test
+}
+paste("True positive: ", round(TP / 100, digits = 3))
+paste("True negative: ", round(TN / 100, digits = 3))
+paste("False positive: ", round(FP / 100, digits = 3))
+paste("False negative: ", round(FN / 100, digits = 3))
+paste("Accuracy: ", round((TP + TN) / 100, digits = 3))
+nullModel = sum(data$shares > 1400) / n
+paste("Null model accuracy: ", round(max(nullModel, 1 - nullModel), 3))
+```
+
+Our prediction is now no better than the null.  I think the regress-first method is more accurate because the boundary is arbitrarily defined; it is not clear why 0 and 1399 should be treated the same but 1399 and 1401 treated differently when training the model, which is what the threshold-first does.
