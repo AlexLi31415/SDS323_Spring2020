@@ -1,0 +1,192 @@
+---
+title: "Exercise 3"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn=-1)
+library(tidyverse)
+library(FNN)
+library(mosaicData)
+library(foreach)
+library(cluster)
+```
+### Predictive Model Building
+```{r greenBuildingsSetup}
+data <- read.csv("~/Documents/SDS323Assignments/greenbuildings.csv")
+dataFiltered = filter(data, leasing_rate >= 10)
+green = filter(dataFiltered, green_rating == 1)
+nonGreen = filter(dataFiltered, green_rating == 0)
+dataFiltered = dataFiltered[!is.na(dataFiltered$Rent), ] #drop those whose rent is NA
+dataFiltered = replace_na(dataFiltered)
+n = nrow(dataFiltered)
+n_train = round(0.8*n)
+n_test = n - n_train
+rmse = function(y, yhat) {
+  sqrt(mean((y - yhat)^2, na.rm = TRUE))
+}
+```
+
+We first find the mean rent and build a null model: 
+```{r nullModel}
+avg = mean(dataFiltered$Rent)
+xData = model.matrix(~ . - Rent, data = dataFiltered)
+yData = model.matrix(~Rent - 1, data = dataFiltered)
+totalErr = 0
+for(i in 1:100)
+{
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+y_train = yData[train_cases,]
+y_test = yData[test_cases,]
+totalErr = totalErr + rmse(avg, y_test)
+}
+totalErr / 100
+```
+
+Our benchmark is around 15.  We now run a linear regression, removing total_dd_07, because it depends entirely on cd.total.07 and hd.total07, as well as the Property ID and cluster number which don't make sense to use as a quantitative variable.
+```{r LinearModel}
+data_train = dataFiltered[train_cases,]
+data_test = dataFiltered[test_cases,]
+totalErr = 0
+for(i in 1:100)
+{
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+data_train = dataFiltered[train_cases,]
+data_test = dataFiltered[test_cases,]
+lm2 = lm(Rent ~ . - CS_PropertyID - total_dd_07 - cluster, data = data_train)
+yhat_test = predict(lm2, data_test)
+totalErr = totalErr + rmse(yhat_test, data_test$Rent)
+}
+totalErr / 100
+lm2
+```
+
+We observe that the coefficients of LEED, Energystar, and green_rating have different signs, which suggests there may be noise in the data.  Similarly, it is unclear why Gas_Costs and Electricity_Costs have different signs.
+```{r LinearModel2}
+data_train = dataFiltered[train_cases,]
+data_test = dataFiltered[test_cases,]
+totalErr = 0
+recip = function(x){1 / x}
+for(i in 1:100)
+{
+train_cases = sample.int(n, n_train, replace=FALSE)
+test_cases = setdiff(1:n, train_cases)
+data_train = dataFiltered[train_cases,]
+data_test = dataFiltered[test_cases,]
+lm2 = lm(Rent ~ . + recip(size) - CS_PropertyID - total_dd_07 - cluster - Energystar - Electricity_Costs, data = data_train)
+yhat_test = predict(lm2, data_test)
+totalErr = totalErr + rmse(yhat_test, data_test$Rent)
+}
+totalErr / 100
+lm2
+```
+To summarize, I ran two regressions and a null model (outputting the mean each time) on the rent per square foot of each house versus several characteristics including the size, the age, and the green rating.  For the first one I used all variables except ones that were clearly redundant and ones that were not suitable for using numerically (such as the numerical property ID). I then removed a few variables which I think affected the output variable in unnatural ways, likely due to noise.  The mean squared error of my model was about 40% better than the null model of choosing the mean each time.  The coefficients of the regression are listed above.  After removing the EnergyStar variable, the rent per square foot seemed to increase slightly with green certification, all other factors being equal.  In conclusion, it seems that green rating appears to be very slightly correlated with an increased price per square foot.
+
+### What causes what?
+
+1. Firstly, correlation does not imply causality.  In fact, the causation may be the other way around, in that, as a response to higher crime, more cops are deployed in certain cities.  This may lead to the wrongful conclusion from regression that more police causes more crime.  Secondly, choosing different cities does not control for other confounding variables that may also strongly affect crime rates, such as socioeconomic status.  In other words, we are comparing apples to oranges when we compare different cities.
+
+2. The researchers set a control with a baseline cop alertness and computed the baseline amount of crime, and, in the same city, the amount of crime when the cop alertness is increased due to an orange alert for terrorism. These increases in alertness was not caused by more crime but by an unrelated reason.  However, on orange alert days, street crimes tended to decrease.  Using a control in the same city helps control for other confounding factors.  
+
+3. The researchers thought of another possible confounding factor: that there may have been fewer potential victims when the terrorism alert is increased, which may make the would-be criminals less likely to feel the incentive to go out and commit a crime.  By checking the metro ridership, the researchers discovered that this was not the case; the ridership was essentially the same.
+
+4. The high alert in district 1 was significantly correlated with a decrease in the amount of crime, after controlling for mid-day ridership (i.e. potential number of victims).  Also, as predicted, the logarithm of the mid-day ridership was significantly, at the 5% level, correlated with an increase in crime, again all else being equal.
+
+### Clustering and PCA
+```{r PCAWine2}
+wineData <- read.csv("~/Documents/SDS323Assignments/wine.csv")
+pc2 = prcomp(wineData[ ,!(colnames(wineData) == c("color", "quality"))], scale=TRUE, rank=2)
+scores = pc2$x
+qplot(scores[,1], scores[,2], color=wineData$color, xlab='Component 1', ylab='Component 2')+ scale_color_manual(values=c("red", "white"))
+```
+
+Wine quality (greater than 5 is good but less than 5 is bad)
+```{r PCAWineQuality}
+qplot(scores[,1], scores[,2], color=wineData$quality>5, xlab='Component 1', ylab='Component 2')+ scale_color_manual(values=c("red", "white"))
+```
+
+Interestingly, a higher component 1 seems to be associated with white wine, while a lower component 1 seems to be associated with red wine.  There does not seem to be a correlation between quality and the PCA values. Component 2 seems not to matter much.  We display another graph with only 1 component.
+```{r PCAWine1}
+wineData <- read.csv("~/Documents/SDS323Assignments/wine.csv")
+pc1 = prcomp(wineData[ ,!(colnames(wineData) == c("color", "quality"))], scale=TRUE, rank=1)
+scores = pc1$x
+qplot(scores[,1], scores[,1], color=wineData$color, xlab='Component 1', ylab='Component 1')+ scale_color_manual(values=c("red", "white"))
+```
+
+We now use k-means clustering.  We first create an elbow plot to help us decide which value of k to choose.
+```{r kMeansElbow}
+X = scale(wineData[ ,!(colnames(wineData) == "color")], center=TRUE, scale=TRUE)
+k_grid = seq(2, 20, by = 1)
+SSE = c()
+for(i in k_grid){
+  cluster_k = kmeans(X, i, nstart = 50)
+  SSE = append(SSE, cluster_k$tot.withinss)
+}
+plot(k_grid, SSE)
+```
+
+We choose k = 5
+```{r kMeans}
+clust1 = kmeans(X, 5, nstart=50)
+table(wineData[which(clust1$cluster == 1),]$color)
+table(wineData[which(clust1$cluster == 2),]$color)
+table(wineData[which(clust1$cluster == 3),]$color)
+table(wineData[which(clust1$cluster == 4),]$color)
+table(wineData[which(clust1$cluster == 5),]$color)
+```
+
+It appears that red wines seem to cluster in clusters 2 and 4, and white wines in 1, 3, and 5; each cluster contained more than 90 percent of one color wine.
+```{r kMeansQuality}
+table(wineData[which(clust1$cluster == 1),]$quality)
+table(wineData[which(clust1$cluster == 2),]$quality)
+table(wineData[which(clust1$cluster == 3),]$quality)
+table(wineData[which(clust1$cluster == 4),]$quality)
+table(wineData[which(clust1$cluster == 5),]$quality)
+```
+
+Cluster 3 seems to be notably associated with better quality, with 6 and 7 the most frequent values, compared to 5 and 6 for the other clusters.  While both k-means and PCA predicted color very well, it seems that k-means was better at predicting wine quality.  I think k-means may have made more sense because certain variables such as acidity may cause degradation if it is either too high or too low, which PCA doesn't account for since it is a linear dimensionality reduction technique.  K-means, on the other hand, only compares wines "close" to each other, which makes it more robust, at least in terms of predicting quality.
+
+### Market segmentation
+```{r MarketSegSetup}
+mktData <- read.csv("~/Documents/SDS323Assignments/social_marketing.csv")
+mktData = mktData[,!(colnames(mktData) == 'X')]
+length(mktData$spam)
+sum(mktData$adult)
+sum(mktData$spam)
+```
+#The amount of spam may be too small for meaningful analysis, but the adult content is quite prevalent.  We use PCA in an attempt to gain insights from the data, as well as taking means based on adult content.
+```{r MarketSegLogistic}
+mktData$adult2 = mktData$adult >= 1
+mktData$isSpam = mktData$spam >= 1
+pc2 = prcomp(mktData, scale=TRUE, rank=2)
+scores = pc2$x
+qplot(scores[,1], scores[,2], color=mktData$adult2, xlab='Component 1', ylab='Component 2')+ scale_color_manual(values=c("red", "green"))
+df1 = colMeans(filter(mktData, adult2 == 0))
+df2 = colMeans(filter(mktData, adult == 1))
+df = rbind(df1, df2)
+df
+```
+
+While PCA didn't lead to any interesting observations, except the fact that a higher component 1 leads to a lower variance in component 2 (which may be just how the PCA is structured), we do notice that adult content seems to be correlated with spam.
+```{r MarketSpamAdult}
+df1 = colMeans(filter(mktData, isSpam == 0))
+df2 = colMeans(filter(mktData, isSpam == 1))
+df = rbind(df1, df2)
+df
+```
+Note that nearly 94% of spam-marked messages contain adult content, with an average of 7.2 instances, but only less than 7% of nonspam-marked messages do. We can try running a logistic regression on how spam can be predicted.  Because the proportion of spam is so low we don't expect a robust model; we are only doing to to gain insights on how to predict spam.
+
+```{r MarketLogistic}
+model = glm(isSpam ~ . - isSpam - spam, data = mktData, family = 'binomial')
+model
+```
+
+Clearly, the fact that adult content exists at all greatly increases the likelihood of spam, with greater adult content further leading to more likely spam.  Also, all else being equal, the presence of less business content seem to be associated with less spam.  We also analyze the correlations between different variables to see if any clusters stand out. 
+``` {r correlations}
+cor(mktData)
+```
+The most obvous clusters of highly correlated variables (r > 0.5) include (chatter, photo_sharing, shopping) and (online gaming, sports playing, university).  The cluster between chatter and photo_sharing seems obvious, but between those two and shopping not immediately so.  The cluster between online gaming, sports playing, and university may be due to the fact that playing sports and online gaming are more popular with university students, i.e. young people.
+
+To summarize, we observed the difference in means of other variables in the Social Marketing dataset by whether or not the datapoint is marked isSpam (spam >= 1) and as adult content (adult >= 1).  We saw no obvious correlation other than the fact that spam tends to strongly imply adult content is present (94% vs 7% for non-spam data).  We then ran a logistic regression with isSpam and observed that the presence of business content may be a significant indicator of a lower likelihood of spam, as can be seen in the table of coefficients above. Furthermore, just the presence of adult content itself was a far better indicator of spam than the actual amount of adult content.  Finally, when analyzing clusters of highly correlated variables, we discovered that online gaming and sports may be more popular among young people, including those in universities.  This should be taken into account when young people are part of the target audience.
